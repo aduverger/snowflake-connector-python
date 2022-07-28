@@ -12,6 +12,8 @@ import socket
 import time
 import webbrowser
 
+import streamlit as st
+
 from .auth import Auth
 from .auth_by_plugin import AuthByPlugin
 from .compat import parse_qs, urlparse, urlsplit
@@ -36,6 +38,7 @@ from .network import (
 logger = logging.getLogger(__name__)
 
 BUF_SIZE = 16384
+STREAMLIT = True
 
 
 # global state of web server that receives the SAML assertion from
@@ -129,28 +132,47 @@ class AuthByWebBrowser(AuthByPlugin):
             )
 
             logger.debug("step 2: open a browser")
+            st.session_state['sso_url'] = sso_url
             if not self._webbrowser.open_new(sso_url):
-                print(
-                    "We were unable to open a browser window for you, "
-                    "please open the following url manually then paste the "
-                    "URL you are redirected to into the terminal."
-                )
-                print(f"URL: {sso_url}")
-                url = input("Enter the URL the SSO URL redirected you to: ")
-                self._process_get_url(url)
-                if not self._token:
-                    # Input contained no token, either URL was incorrectly pasted,
-                    # empty or just wrong
-                    self.handle_failure(
-                        {
-                            "code": ER_UNABLE_TO_OPEN_BROWSER,
-                            "message": (
-                                "Unable to open a browser in this environment and "
-                                "SSO URL contained no token"
-                            ),
-                        }
+                if not STREAMLIT:
+                    print(
+                        "We were unable to open a browser window for you, "
+                        "please open the following url manually then paste the "
+                        "URL you are redirected to into the terminal."
                     )
-                    return
+                    print(f"URL: {sso_url}")
+                    url = input("Enter the URL the SSO URL redirected you to: ")
+                    self._process_get_url(url)
+                    if not self._token:
+                        # Input contained no token, either URL was incorrectly pasted,
+                        # empty or just wrong
+                        self.handle_failure(
+                            {
+                                "code": ER_UNABLE_TO_OPEN_BROWSER,
+                                "message": (
+                                    "Unable to open a browser in this environment and "
+                                    "SSO URL contained no token"
+                                ),
+                            }
+                        )
+                        return
+                else:
+                    url = input("Enter the URL the SSO URL redirected you to: ")
+                    self._process_get_url(url)
+                    if not self._token:
+                        # Input contained no token, either URL was incorrectly pasted,
+                        # empty or just wrong
+                        self.handle_failure(
+                            {
+                                "code": ER_UNABLE_TO_OPEN_BROWSER,
+                                "message": (
+                                    "Unable to open a browser in this environment and "
+                                    "SSO URL contained no token"
+                                ),
+                            }
+                        )
+                        return
+                        
             else:
                 logger.debug("step 3: accept SAML token")
                 self._receive_saml_token(socket_connection)
